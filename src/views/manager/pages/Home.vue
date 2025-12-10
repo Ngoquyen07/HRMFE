@@ -69,7 +69,6 @@ const router = useRouter()
 function goToProject(id: number) {
   router.push(`/manager/projects/${id}`)
 }
-
 provide('employees', employees);
 </script>
 
