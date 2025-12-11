@@ -119,7 +119,7 @@ async function handleUpdateTask() {
 
     // Tắt modal và load lại dữ liệu
     closeModal()
-    showToast('Update Successfully!', 'success')
+    showToast('Update task successfully', 'success')
     await loadAllData() // Reload để cập nhật list và thống kê
 
     // Hiển thị thông báo thành công
