@@ -172,7 +172,7 @@ async function handleUpdateProject() {
       projectErrors.value = err.response.data.errors
       showToast("Validation error. Please check your input.", "error")
     }
-    // ❌ Lỗi server khác
+
     else {
       showToast(err.response?.data?.message || "Failed to update project", "error")
     }
@@ -237,7 +237,10 @@ async function handleUpdateTask() {
   try {
     const payload = {
       project_id: id,
-      ...currentTaskForm
+      start_date : currentTaskForm.start_date,
+      end_date:currentTaskForm.end_date,
+      status: currentTaskForm.status,
+      description: currentTaskForm.description,
     }
 
     await taskApi.updateTask(currentTaskId.value, payload)
@@ -345,18 +348,28 @@ onMounted(() => {
             </div>
 
             <div class="mb-3">
-              <label class="form-label fw-bold">Progress (%)</label>
-              <input type="number"
-                     class="form-control"
-                     v-model="projectInfo.progress"
-                     min="0"
-                     max="100"
-                     :class="{'is-invalid': projectErrors.progress}" />
+              <label class="form-label fw-bold d-flex justify-content-between">
+                <span>Progress</span>
+                <span class="badge" :class="getProgressColor(projectInfo.progress)">
+                  {{ projectInfo.progress }}%
+                </span>
+              </label>
 
-              <div class="invalid-feedback" v-if="projectErrors.progress">
-                {{ projectErrors.progress[0] }}
+              <div class="d-flex align-items-center">
+                <input
+                  type="range"
+                  class="form-range"
+                  v-model.number="projectInfo.progress"
+                  min="0"
+                  max="100"
+                  step="1"
+                  :class="{'is-invalid': projectErrors.progress}"
+                />
               </div>
 
+              <div class="invalid-feedback d-block" v-if="projectErrors.progress">
+                {{ projectErrors.progress[0] }}
+              </div>
             </div>
 
             <div class="d-flex justify-content-end">
@@ -458,19 +471,18 @@ onMounted(() => {
             <h5 class="modal-title">{{ isEditMode ? 'Edit Task' : 'Create New Task' }}</h5>
             <button type="button" class="btn-close" @click="closeTaskModal"></button>
           </div>
-
           <div class="modal-body">
             <form @submit.prevent>
               <div class="row">
                 <div class="col-md-6 mb-3">
-                  <label class="form-label">Task Name <span class="text-danger">*</span></label>
-                  <input type="text" class="form-control" :class="{'is-invalid': errors.name}" v-model="currentTaskForm.name" />
+                  <label class="form-label">Task Name </label>
+                  <input type="text" class="form-control" :class="{'is-invalid': errors.name}" v-model="currentTaskForm.name" :readonly="isEditMode"/>
                   <div class="invalid-feedback" v-if="errors.name">{{ errors.name[0] }}</div>
                 </div>
 
                 <div class="col-md-6 mb-3">
-                  <label class="form-label">Assign Employee <span class="text-danger">*</span></label>
-                  <select class="form-select" :class="{'is-invalid': errors.employee_id}" v-model="currentTaskForm.employee_id">
+                  <label class="form-label">Assign Employee</label>
+                  <select class="form-select" :class="{'is-invalid': errors.employee_id}" v-model="currentTaskForm.employee_id" :disabled="isEditMode" >
                     <option :value="null">Select an employee...</option>
                     <option v-for="emp in employees" :value="emp.id" :key="emp.id">
                       {{ emp.name }}
@@ -481,7 +493,7 @@ onMounted(() => {
 
                 <div class="col-md-6 mb-3">
                   <label class="form-label">Start Date</label>
-                  <input type="date" class="form-control" :class="{'is-invalid': errors.start_date}" v-model="currentTaskForm.start_date" />
+                  <input type="date" class="form-control" :class="{'is-invalid': errors.start_date}" v-model="currentTaskForm.start_date"  />
                   <div class="invalid-feedback" v-if="errors.start_date">{{ errors.start_date[0] }}</div>
                 </div>
 
@@ -511,6 +523,7 @@ onMounted(() => {
                     v-model="currentTaskForm.progress"
                     min="0"
                     max="100"
+                    :readonly="isEditMode"
                   />
                   <div class="invalid-feedback" v-if="errors.progress">
                     {{ errors.progress[0] }}

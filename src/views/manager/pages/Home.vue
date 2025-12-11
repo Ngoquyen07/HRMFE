@@ -78,7 +78,7 @@ provide('employees', employees);
       <div>
         <h2 class="fw-bold text-dark">Dashboard</h2>
         <p class="text-muted mb-0" v-if="manager">
-          Welcome back, <strong class="text-primary">{{ manager.name }}</strong> 👋
+          Welcome back, <strong class="text-primary">{{ manager.name }}</strong>
         </p>
       </div>
       <LogoutBtn />
