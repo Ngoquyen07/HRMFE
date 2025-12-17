@@ -19,7 +19,7 @@ const router = createRouter({
     {
       path: "/",
       name: "root",
-      redirect: to => {
+      redirect: _to => {
         // Redirect tạm thời, logic chính nằm ở beforeEach
         return { name: 'login' };
       }
@@ -50,10 +50,9 @@ const router = createRouter({
 });
 
 router.beforeEach(async (to, _from, next) => {
-  // 1. LẤY THÔNG TIN USER NẾU CHƯA CÓ (F5 trang)
+  //  Lấy thông tin user .
   try {
     if (!user.value) {
-      // Giả sử API trả về structure: { data: { role: '...', ... } }
       const res = await auth.getUser();
       user.value = res.data;
     }
@@ -61,40 +60,26 @@ router.beforeEach(async (to, _from, next) => {
     user.value = null;
   }
 
-  console.log('Log user from router ( index.ts) ', user.value);
-
-  // 2. TRƯỜNG HỢP: CHƯA ĐĂNG NHẬP
+  // Không lấy được ( Chưa đăng nhập ) -> Chuyển về trang login
   if (!user.value) {
-    // Nếu đang cố vào trang login thì cho qua
     if (to.name === "login") {
       return next();
     }
-    // Các trang khác -> đá về login
     return next({ name: "login" });
   }
 
-  // 3. TRƯỜNG HỢP: ĐÃ ĐĂNG NHẬP
-  // Xác định trang chủ dựa trên Role hiện tại
-  const role = user.value.role; // 'manager' hoặc 'employee'
-
-  // Mapping role sang route name tương ứng
+  // Đã đăng nhập -> Check role
+  const role = user.value.role;
   const homeRouteName = role === 'manager' ? 'manager.home' : 'employee.home';
 
-  // 3a. Nếu đã login mà cố vào trang Login HOẶC trang gốc (/)
-  // -> Chuyển hướng về trang chủ của role đó
+  // Tự điều hướng ở trang login hoặc '/'
   if (to.name === "login" || to.path === "/") {
     return next({ name: homeRouteName });
   }
-
-  // 3b. Kiểm tra quyền truy cập (Role Guard)
-  // Nếu route đích có yêu cầu role (meta.role) VÀ role đó khác role của user
+  // Sai role ( cố truy cập sang trang của role khác ) -> chuyển về trang chủ .
   if (to.meta.role && to.meta.role !== role) {
-    // Ví dụ: User là 'employee' nhưng cố vào URL '/manager/home'
-    // -> Đá về trang chủ đúng của họ (hoặc trang 403 tùy bạn)
     return next({ name: homeRouteName });
   }
-
-  // 4. Các trường hợp hợp lệ -> Cho đi tiếp
   next();
 });
 
