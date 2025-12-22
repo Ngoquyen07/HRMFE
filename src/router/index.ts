@@ -6,6 +6,8 @@ import ManagerHome from '@/views/manager/pages/Home.vue'
 import NotFound from '@/views/errorNotFound/404.vue'
 import { user } from '@/stores/user.ts'
 import ProjectDetail from '@/views/manager/pages/ProjectDetail.vue'
+import EmployeeProfile from '@/views/employee/pages/EmployeeProfile.vue'
+import ManagerProfile from '@/views/manager/pages/ManagerProfile.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -31,9 +33,21 @@ const router = createRouter({
       meta: { role: "employee" },
     },
     {
+      path: "/employee/profile",
+      name: "employee.profile",
+      component: EmployeeProfile,
+      meta: { role: "employee" },
+    },
+    {
       path: "/manager/home",
       name: "manager.home",
       component: ManagerHome,
+      meta: { role: "manager" },
+    },
+    {
+      path: "/manager/profile",
+      name: "manager.profile",
+      component: ManagerProfile,
       meta: { role: "manager" },
     },
     {
@@ -72,7 +86,7 @@ router.beforeEach(async (to, _from, next) => {
   const role = user.value.role;
   const homeRouteName = role === 'manager' ? 'manager.home' : 'employee.home';
 
-  // Tự điều hướng ở trang login hoặc '/'
+  // Tự điều hướng về home
   if (to.name === "login" || to.path === "/") {
     return next({ name: homeRouteName });
   }

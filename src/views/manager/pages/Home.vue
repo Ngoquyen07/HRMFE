@@ -19,6 +19,7 @@ const loading = ref(false)
 
 const error = ref('')
 
+
 // --- Dữ liệu Modal & Form ---
 const showModal = ref(false)
 const isSubmitting = ref(false)
@@ -108,19 +109,46 @@ async function loadAll() {
 
 const errors = ref({});
 provide('errors', errors);
-async function submitProject() {
-  isSubmitting.value = true
+const uploadProgress = ref(0);
+
+async function submitProject(files: File[]) {
+  isSubmitting.value = true;
   errors.value = {};
+  uploadProgress.value = 0;
+
+  //Khởi tạo FormData
+  const formData = new FormData();
+
+  // Ném dữ liệu từ form vào formdata
+  Object.keys(form).forEach(key => {
+    const value = (form as any)[key];
+    if (value !== null && value !== undefined) {
+      formData.append(key, value);
+    }
+  });
+  // Ném các file vào formdata
+  files.forEach((file) => {
+    formData.append('files[]', file);
+  });
+
   try {
-    const res = await projectApi.createProject(form);
-    console.log(res)
-    closeModal()
-    toastRef.value?.show("Created project successfully.", "success")
-    await loadAll()
-  } catch (err : any) {
-    errors.value = err.response.data.errors
+    const res = await projectApi.createProject(formData, (percent: number) => {
+      uploadProgress.value = percent;
+    });
+
+    console.log(res);
+    closeModal();
+    toastRef.value?.show("Created project successfully.", "success");
+    await loadAll();
+  } catch (err: any) {
+    if (err.response?.data?.errors) {
+      errors.value = err.response.data.errors;
+    } else {
+      toastRef.value?.show("An error occurred.", "danger");
+    }
   } finally {
-    isSubmitting.value = false
+    isSubmitting.value = false;
+    uploadProgress.value = 0;
   }
 }
 
@@ -147,11 +175,20 @@ provide('form', form);
         <DashBoardCard title="Total Employees" color="bg-danger" :count="employees.length"/>
       </div>
       <div class="row g-4">
-        <ProjectsList :projects="projects" :go-to-project="goToProject" :get-status-color="getStatusColor"/>
+        <ProjectsList
+          :projects="projects"
+          :go-to-project="goToProject"
+          :get-status-color="getStatusColor"/>
         <MemberList :employees="employees"/>
       </div>
     </div>
-    <CreateModal :show-modal="showModal" :close-modal="closeModal" :submit-project="submitProject" :is-submitting="isSubmitting"/>
+    <CreateModal
+      :show-modal="showModal"
+      :close-modal="closeModal"
+      :submit-project="submitProject"
+      :is-submitting="isSubmitting"
+      :upload-progress="uploadProgress"
+    />
   </div>
 </template>
 <style scoped>

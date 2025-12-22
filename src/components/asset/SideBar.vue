@@ -5,7 +5,7 @@ import { user } from '@/stores/user.ts'
 import router from '@/router'
 
 const isLogout = ref(false)
-
+const role = user.value?.role as string
 async function logout() {
   isLogout.value = true
   try {
@@ -55,7 +55,7 @@ async function logout() {
     </div>
 
     <div class="offcanvas-body">
-      <RouterLink to="#" class="btn btn-outline-light w-100 mb-3">
+      <RouterLink :to="'/' + role + '/profile'" class="btn btn-outline-light w-100 mb-3">
         <i class="bi bi-person-circle me-2"></i> Profile
       </RouterLink>
 

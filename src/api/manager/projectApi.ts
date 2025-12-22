@@ -5,9 +5,19 @@ const projectApi = {
     await auth.getCSRFToken();
     return await axiosClient.get(`/api/manager/projects/${id}`)
   },
-  async createProject(data: any): Promise<any> {
+  async createProject(formData: FormData, onProgress: (percent: number) => void) {
     await auth.getCSRFToken();
-    return await axiosClient.post(`/api/manager/projects`, data)
+    return await axiosClient.post('/api/manager/projects', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      },
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.total) {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress(percentCompleted);
+        }
+      }
+    });
   },
   async updateProject(data: any): Promise<any> {
     await auth.getCSRFToken();

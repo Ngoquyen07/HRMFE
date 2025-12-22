@@ -10,16 +10,16 @@ import ProjectDetailHeader from '@/components/manager/details/ProjectDetailHeade
 import ProjectDetailForm from '@/components/manager/details/ProjectDetailForm.vue'
 import TaskList from '@/components/manager/details/TaskList.vue'
 import type { Employee } from '@/interfaces/Employee.ts'
-import type { Project } from '@/interfaces/Project.ts'
-import type { Task } from '@/interfaces/Task.ts'
 import CreateAndEditTaskModal from '@/components/manager/details/CreateAndEditTaskModal.vue'
+import Document from '@/components/manager/details/Document.vue'
+import documentApi from '@/api/document/documentApi.ts'
 
 const route = useRoute()
 const id = Number(route.params.id)
 
 // Data
 const employees = ref<Employee[]>([])
-const projectInfo = ref<Project | null>(null)
+const projectInfo = ref<any | null>(null)
 const originalProjectState = ref<{ status: string; progress: number ; description : string } | null>(null)
 
 // Modal State
@@ -38,7 +38,8 @@ const toastRef = ref<{
 } | null>(null)
 
 // Form Data (Dùng chung cho Create và Edit)
-const defaultTaskState: Task = {
+const defaultTaskState: any = {
+  id : null,
   name: '',
   description: '',
   status: 'todo',
@@ -46,8 +47,9 @@ const defaultTaskState: Task = {
   end_date: '',
   progress: 0,
   employee_id: null,
+  documents : null
 }
-const currentTaskForm = reactive<Task>({ ...defaultTaskState })
+const currentTaskForm = reactive<any>({ ...defaultTaskState })
 provide('currentTaskForm',currentTaskForm);
 
 // ====================== 3. HELPER FUNCTIONS ======================
@@ -151,13 +153,14 @@ function openCreateModal() {
   isModalOpen.value = true
 }
 
-function openEditModal(task: Task) {
+function openEditModal(task: any) {
   isEditMode.value = true
   currentTaskId.value = task.id!
   errors.value = {}
 
   // Fill dữ liệu vào form
   Object.assign(currentTaskForm, {
+    id : task.id,
     name: task.name,
     description: task.description,
     status: task.status,
@@ -165,8 +168,8 @@ function openEditModal(task: Task) {
     employee_id: task.employee_id,
     start_date: formatDateForInput(task.start_date), // Xử lý ngày tháng cho input
     end_date: formatDateForInput(task.end_date),
+    documents: task.documents || []
   })
-
   isModalOpen.value = true
 }
 
@@ -174,19 +177,41 @@ function closeTaskModal() {
   isModalOpen.value = false
 }
 
-// --- TASK CRUD OPERATIONS ---
+// --- TASK CRUD ---
 
-// 1. Create Task
-async function handleCreateTask() {
-  errors.value = {}
+async function handleCreateTask(files: File[]) {
+  errors.value = {};
+  const payload = { project_id: id, ...currentTaskForm }
+  //Khởi tạo FormData
+  const formData = new FormData();
+
+  // Ném dữ liệu từ form vào formdata
+  Object.keys(payload).forEach(key => {
+    const value = (payload as any)[key];
+    if (value !== null && value !== undefined) {
+      formData.append(key, value);
+    }
+  });
+
+  // Ném các file vào formdata
+  files.forEach((file) => {
+    formData.append('files[]', file);
+  });
+
   try {
-    const payload = { project_id: id, ...currentTaskForm }
-    const res = await taskApi.creatTask(payload)
-    toastRef.value?.show(res.data.message || 'Task created successfully', 'success')
+    const res = await taskApi.createTask(formData)
+    console.log(res);
+    toastRef.value?.show("Created task successfully.", "success");
     closeTaskModal()
     await loadInfo()
   } catch (err: any) {
-    handleApiErrors(err)
+    if (err.response?.data?.errors) {
+      errors.value = err.response.data.errors;
+    } else {
+      toastRef.value?.show("An error occurred.", "danger");
+    }
+  } finally {
+    uploadProgress.value = 0;
   }
 }
 
@@ -233,13 +258,91 @@ async function handleDeleteTask() {
   }
 }
 
-// Error Handler helper
-function handleApiErrors(err: any) {
-  if (err.response?.status === 422) {
-    errors.value = err.response.data.errors
-    toastRef.value?.show('Validation Error. Please check inputs.', 'danger')
-  } else {
-    toastRef.value?.show(err.response?.data?.message || 'Server Error', 'danger')
+// Thêm vào phần <script setup> của bạn
+async function handleDownload(doc: any) {
+  try {
+    const res = await documentApi.downloadDocument(doc.id);
+    // Tạo một URL tạm thời từ dữ liệu Blob
+    const url = window.URL.createObjectURL(new Blob([res.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    // Đặt tên file khi tải về
+    link.setAttribute('download', doc.name);
+    document.body.appendChild(link);
+    link.click();
+
+    // Dọn dẹp bộ nhớ
+    link.remove();
+    window.URL.revokeObjectURL(url);
+
+    // toastRef.value?.show('Downloading started...', 'success');
+  } catch (err) {
+    console.error('Download error:', err);
+    toastRef.value?.show('Failed to download file', 'danger');
+  }
+}
+// --- Logic Thêm File ---
+const isUploading = ref(false);
+const uploadProgress = ref(0);
+async function handleUploadFiles(fileList: FileList , model : any) {
+  isUploading.value = true;
+  uploadProgress.value = 0;
+  const formData = new FormData();
+
+  // Gửi ID project để BE biết gắn vào project nào
+  formData.append('documentable_id', model.id.toString());
+  formData.append('documentable_type', model.type);
+  Array.from(fileList).forEach(file => {
+    formData.append('files[]', file);
+  });
+
+  try {
+    await documentApi.uploadDocument(formData , (percent : number) => {
+      uploadProgress.value = percent;
+    });
+    toastRef.value?.show('Files uploaded successfully', 'success');
+    await loadInfo();
+    if (model.type === 'task') {
+      // Tìm task vừa được upload trong danh sách task mới tải về
+      const updatedTask = projectInfo.value?.tasks?.find((t: any) => t.id === model.id);
+      if (updatedTask) {
+        // Cập nhật lại danh sách documents của form
+        currentTaskForm.documents = updatedTask.documents;
+      }
+    }
+  } catch (err: any) {
+    toastRef.value?.show(err.response?.data?.message || 'Upload failed', 'danger');
+  } finally {
+    isUploading.value = false;
+  }
+}
+
+// --- Logic Xóa File ---
+async function handleDeleteDocument(docId: number) {
+
+  try {
+    const res = await documentApi.deleteDocument(docId);
+    console.log(res)
+    toastRef.value?.show('Document deleted', 'success');
+
+    // Cập nhật UI local
+    if (projectInfo.value) {
+      projectInfo.value.documents = projectInfo.value.documents.filter((d : any ) => d.id !== docId);
+    }
+    if (projectInfo.value?.tasks) {
+      projectInfo.value.tasks.forEach((task: any) => {
+        if (task.documents) {
+          task.documents = task.documents.filter((d: any) => d.id !== docId);
+        }
+      });
+    }
+    if (currentTaskForm.documents) {
+      currentTaskForm.documents = currentTaskForm.documents.filter(
+        (d: any) => d.id !== docId
+      );
+    }
+  } catch (err: any) {
+    toastRef.value?.show('Failed to delete document', 'danger');
   }
 }
 
@@ -264,6 +367,12 @@ onMounted(() => {
       :has-project-changed="hasProjectChanged"
       :handle-update-project="handleUpdateProject"
       :handle-delete-project="handleDeleteProject"/>
+    <Document
+      :project-info="projectInfo"
+      :handle-download="handleDownload"
+      :is-uploading="isUploading"
+      :handle-upload="handleUploadFiles"
+      :handle-delete="handleDeleteDocument" />
     <TaskList
       :project-info="projectInfo"
       :open-create-modal="openCreateModal"
@@ -279,7 +388,12 @@ onMounted(() => {
       :format-date-for-input="formatDateForInput"
       :handle-delete-task="handleDeleteTask"
       :handle-create-task="handleCreateTask"
-      :handle-update-task="handleUpdateTask"/>
+      :handle-update-task="handleUpdateTask"
+      :handle-download="handleDownload"
+      :handle-delete-doc="handleDeleteDocument"
+      :handle-upload="handleUploadFiles"
+      :is-uploading="isUploading"
+    />
   </div>
 
   <div v-else class="d-flex justify-content-center align-items-center" style="height: 50vh">
