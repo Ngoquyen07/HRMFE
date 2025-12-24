@@ -336,7 +336,7 @@ async function handleDeleteDocument(docId: number) {
         }
       });
     }
-    if (currentTaskForm.documents) {
+      if (currentTaskForm.documents) {
       currentTaskForm.documents = currentTaskForm.documents.filter(
         (d: any) => d.id !== docId
       );
